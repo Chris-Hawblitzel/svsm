@@ -141,6 +141,20 @@ impl VMR {
         }
     }
 
+    /// Populate a dormant incoming task root during migration.
+    ///
+    /// # Safety
+    /// No CPU may use this root until population completes. The scheduler
+    /// must claim the task after the preceding CPU switched away from its CR3.
+    #[cfg(feature = "verismo-paging")]
+    pub unsafe fn populate_inactive(&self, pgtbl: &mut PageTable) {
+        let parts = self.pgtbl_parts.lock_read();
+        for part in parts.iter() {
+            // SAFETY: the caller excludes every hardware user of this root.
+            unsafe { pgtbl.populate_pgtbl_part_inactive(part) };
+        }
+    }
+
     fn populate_addr(&self, pgtbl: &mut PageTable, vaddr: VirtAddr) -> Result<(), SvsmError> {
         let vregion = self.virt_range();
         if !vregion.contains(vaddr) {

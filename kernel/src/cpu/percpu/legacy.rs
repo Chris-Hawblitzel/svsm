@@ -905,6 +905,17 @@ impl PerCpu {
         self.vm_range.populate(pt);
     }
 
+    /// Replace per-CPU mappings in an incoming, hardware-inactive task root.
+    ///
+    /// # Safety
+    /// The caller must exclusively claim the task after its previous CPU
+    /// switched off the root, and exclude all hardware users until return.
+    #[cfg(feature = "verismo-paging")]
+    pub unsafe fn populate_page_table_inactive(&self, pt: &mut PageTable) {
+        // SAFETY: the caller supplies the scheduler's inactive-root guarantee.
+        unsafe { self.vm_range.populate_inactive(pt) };
+    }
+
     pub fn handle_pf(&self, vaddr: VirtAddr, write: bool) -> Result<(), SvsmError> {
         self.with_pgtable_mut(|pg| self.vm_range.handle_page_fault(pg, vaddr, write))
     }

@@ -14,6 +14,7 @@ doctest = true
 
 [dependencies]
 bootdefs.workspace = true
+paging = { package = "verios-pagetable-beta", path = "../../..", optional = true }
 bootimg.workspace = true
 cpuarch.workspace = true
 cpufeature.workspace = true
@@ -96,6 +97,7 @@ attest = [
 attest-serial = ["attest"]
 
 default = []
+verismo-paging = ["dep:paging", "paging/lock-wait-hook"]
 persistence = ["dep:cocoon-tpm-storage", "block", "attest"]
 enable-gdb = ["dep:gdbstub", "dep:gdbstub_arch"]
 vtpm = ["dep:libtcgtpm"]

@@ -12,7 +12,15 @@ pub mod mappings;
 pub mod memory;
 pub mod page_visibility;
 mod pagebox;
+#[cfg(not(feature = "verismo-paging"))]
 pub mod pagetable;
+#[cfg(feature = "verismo-paging")]
+#[path = "pagetable_verismo.rs"]
+pub mod pagetable;
+#[cfg(feature = "verismo-paging")]
+#[path = "pagetable.rs"]
+#[allow(dead_code)]
+mod pagetable_native;
 pub mod ptguards;
 pub mod ro_after_init;
 pub mod validate;

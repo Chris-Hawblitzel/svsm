@@ -2,6 +2,8 @@
 
 [target.x86_64-unknown-none]
 rustflags = [
+    "--cfg",
+    'target_min_page="4kib"',
     "-C",
     "force-frame-pointers",
     "--cfg",
@@ -13,7 +15,7 @@ rustflags = [
 ]
 
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "code-model=kernel"]
+rustflags = ["-C", "code-model=kernel", "--cfg", 'target_min_page="4kib"']
 
 [alias]
 verify = "verus focus --features verus"

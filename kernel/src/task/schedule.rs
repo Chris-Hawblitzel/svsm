@@ -626,7 +626,16 @@ pub unsafe fn update_task_percpu_page_tables(t: *const Task) {
     // SAFETY: the caller guarantees the correctness of the task pointer.
     let task = unsafe { &*t };
     let mut pt = task.page_table.lock_write();
+    #[cfg(not(feature = "verismo-paging"))]
     this_cpu().populate_page_table(&mut pt);
+    #[cfg(feature = "verismo-paging")]
+    // SAFETY: switch_to first switches the previous CPU to its per-CPU CR3,
+    // then clears TASK_STATE_ACTIVE. The incoming CPU claims that flag using
+    // locked xchg before reaching this function and has not loaded this root.
+    // Thus no CPU can walk this root while its per-CPU branch is replaced.
+    unsafe {
+        this_cpu().populate_page_table_inactive(&mut pt);
+    }
 }
 
 /// Perform a task switch and hand the CPU over to the next task on the

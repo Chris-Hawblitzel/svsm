@@ -360,9 +360,17 @@ unsafe fn svsm_start(
 
     // SAFETY: the current page table was was placed into the kernel heap as
     // part of the boot image and therefore it can be built into a PageBox.
+    #[cfg(not(feature = "verismo-paging"))]
     let init_pgtable: PageBox<PageTable> = unsafe {
         let page_table_ptr = (launch_info.kernel_page_table_vaddr as usize) as *mut PageTable;
         PageBox::from_raw(NonNull::new(page_table_ptr).unwrap())
+    };
+    #[cfg(feature = "verismo-paging")]
+    // SAFETY: the boot image supplies a live, initialized root in the heap.
+    // Bootstrap runs on the BSP before any other CPU or software writer exists.
+    let init_pgtable = unsafe {
+        PageTable::rebuild_boot_root(VirtAddr::from(launch_info.kernel_page_table_vaddr))
+            .expect("Failed to rebuild boot page tables")
     };
 
     init_global_ranges();
@@ -378,6 +386,13 @@ unsafe fn svsm_start(
     bsp_percpu
         .setup_on_cpu(platform)
         .expect("Failed to run percpu.setup_on_cpu()");
+    #[cfg(feature = "verismo-paging")]
+    // SAFETY: BSP per-CPU keys are now installed. Bootstrap has been single-
+    // threaded and IRQ-disabled; AP startup installs its keys before paging,
+    // and the fatal NMI path does not enter paging.
+    unsafe {
+        PageTable::enable_runtime_locking();
+    }
     bsp_percpu.load();
     // Now the stack unwinder can be used
     // SAFETY: the stack addresses were initialized during kernel entry and

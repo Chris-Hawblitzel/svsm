@@ -24,6 +24,11 @@ Detailed installation instructions are in the [INSTALL.md](Documentation/docs/in
 file. It walks through the process of building all the necessary parts
 to get a virtual machine powered by the COCONUT-SVSM up and running.
 
+This local compatibility checkout also provides an opt-in `verismo-paging`
+backend; native paging remains the default. See
+[VeriSMo paging](Documentation/docs/developer/VERISMO_PAGING.md) for builds,
+ownership design, executable host tests, and hardware-validation limitations.
+
 Community
 ---------
 

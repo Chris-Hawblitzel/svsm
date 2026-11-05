@@ -96,7 +96,7 @@ pub fn private_pte_mask() -> usize {
 }
 
 /// Returns the shared encrypt mask value.
-fn shared_pte_mask() -> usize {
+pub(super) fn shared_pte_mask() -> usize {
     *SHARED_PTE_MASK
 }
 
@@ -106,7 +106,7 @@ pub fn max_phys_addr() -> PhysAddr {
 }
 
 /// Returns the supported flags considering the feature mask.
-fn supported_flags(flags: PTEntryFlags) -> PTEntryFlags {
+pub(super) fn supported_flags(flags: PTEntryFlags) -> PTEntryFlags {
     flags & *FEATURE_MASK
 }
 
@@ -118,6 +118,13 @@ fn make_shared_address(paddr: PhysAddr) -> PhysAddr {
 /// Set address as private via mask.
 pub fn make_private_address(paddr: PhysAddr) -> PhysAddr {
     (strip_shared_address_bits(paddr).bits() | private_pte_mask()).into()
+}
+
+#[cfg(all(test, feature = "verismo-paging", not(target_os = "none")))]
+pub(super) fn init_backend_test_masks() {
+    let _ = PRIVATE_PTE_MASK.init(1 << 51);
+    let _ = SHARED_PTE_MASK.init(1 << 50);
+    let _ = FEATURE_MASK.init(PTEntryFlags::all());
 }
 
 // Returns true if the address is shared.

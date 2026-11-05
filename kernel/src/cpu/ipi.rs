@@ -78,6 +78,16 @@ pub enum IpiTarget<'a> {
 /// copy routine correctly copies all data and resolves all references within
 /// the copied data.
 pub unsafe trait IpiMessage {
+    /// Whether this message may run while paging content locks or their
+    /// callers' locks are held. Returning true promises that invocation only
+    /// invalidates translations: it must not access pageable memory, acquire
+    /// software locks, send IPIs, or re-enter paging. This is part of the
+    /// unsafe implementation contract.
+    #[cfg(feature = "verismo-paging")]
+    fn poll_with_paging_lock(&self) -> bool {
+        false
+    }
+
     /// All IPI messages must be copied into a shared IPI buffer since stack
     /// locals are not visible across CPU/task contexts.  This function must
     /// perform a deep copy of the contents of the source buffer into the
@@ -186,6 +196,8 @@ struct IpiBoard {
 
     // A function pointer that will handle the IPI on the receiving CPU.
     handler: Cell<MaybeUninit<unsafe fn(*const ())>>,
+    #[cfg(feature = "verismo-paging")]
+    poll_with_paging_lock: Cell<bool>,
 }
 
 #[derive(Debug, Default)]
@@ -220,6 +232,10 @@ pub trait IpiHelper {
     fn copy_to_shared(&self, shared_buffer: &mut [u8]);
     fn copy_from_shared(&mut self, shared_buffer: *const ());
     fn get_invoke_routine(&self) -> unsafe fn(*const ());
+    #[cfg(feature = "verismo-paging")]
+    fn poll_with_paging_lock(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]
@@ -243,6 +259,11 @@ impl<'a, T: IpiMessage + Sync> IpiHelperShared<'a, T> {
 }
 
 impl<T: IpiMessage + Sync> IpiHelper for IpiHelperShared<'_, T> {
+    #[cfg(feature = "verismo-paging")]
+    fn poll_with_paging_lock(&self) -> bool {
+        self.message.poll_with_paging_lock()
+    }
+
     fn request_type(&self) -> IpiRequest {
         IpiRequest::IpiShared
     }
@@ -317,6 +338,8 @@ impl Default for IpiBoard {
             pending: AtomicUsize::new(0),
             message: UnsafeCell::new(MaybeUninit::uninit()),
             handler: Cell::new(MaybeUninit::uninit()),
+            #[cfg(feature = "verismo-paging")]
+            poll_with_paging_lock: Cell::new(false),
         }
     }
 }
@@ -347,6 +370,10 @@ fn send_ipi(target_set: IpiTarget<'_>, ipi_helper: &mut dyn IpiHelper) {
     ipi_board
         .handler
         .set(MaybeUninit::new(ipi_helper.get_invoke_routine()));
+    #[cfg(feature = "verismo-paging")]
+    ipi_board
+        .poll_with_paging_lock
+        .set(ipi_helper.poll_with_paging_lock());
     // SAFETY: the IPI board is known to be in an uninitialized state and
     // because the request mask on the target CPUs have not yet been updated
     // to indicate a pending message from this CPU, there are no other threads
@@ -475,6 +502,8 @@ fn send_ipi(target_set: IpiTarget<'_>, ipi_helper: &mut dyn IpiHelper) {
     // TPR_IPI, any other IPIs that arrive while waiting here will interrupt
     // this spin loop and will be processed correctly.
     while ipi_board.pending.load(Ordering::Acquire) != 0 {
+        #[cfg(feature = "verismo-paging")]
+        poll_paging_flush_ipis();
         core::hint::spin_loop();
     }
 
@@ -581,6 +610,42 @@ pub fn handle_ipi_interrupt() {
             ipi_board.pending.fetch_sub(1, Ordering::Release);
         }
     }
+}
+
+/// Service only explicitly lock-independent translation shootdowns. A paging
+/// writer can wait for remote invalidation while holding a content lock, and
+/// a remote waiter may have entered with IRQs disabled. Polling breaks that
+/// cycle without enabling unrelated interrupts or processing arbitrary IPIs.
+#[cfg(feature = "verismo-paging")]
+pub(crate) fn poll_paging_flush_ipis() {
+    let _guard = TprGuard::raise(TPR_IPI);
+    // SAFETY: this CPU owns its receive state; TPR_IPI excludes its interrupt
+    // handler while requests are examined and consumed.
+    let requests = unsafe { &this_cpu().shared().ipi_state().request_set };
+    for cpu in PERCPU_AREAS.iter() {
+        let index = cpu.cpu_index();
+        if !requests.contains(index, Ordering::Acquire) {
+            continue;
+        }
+        // SAFETY: observing the sender's release-published request pins its
+        // fully initialized board until this receiver decrements pending.
+        let board = unsafe { &cpu.ipi_state().ipi_board };
+        // SAFETY: the acquired request pins this board, and TPR_IPI excludes
+        // another receiver on this CPU.
+        unsafe { poll_paging_board(requests, index, board) };
+    }
+}
+
+#[cfg(feature = "verismo-paging")]
+unsafe fn poll_paging_board(requests: &AtomicCpuSet, index: usize, board: &IpiBoard) {
+    if !board.poll_with_paging_lock.get() {
+        return;
+    }
+    requests.remove(index, Ordering::Relaxed);
+    // SAFETY: the caller supplies a release-published pinned board and an
+    // exclusive receiver. The marker permits only lock-independent handlers.
+    unsafe { receive_single_ipi(board) };
+    board.pending.fetch_sub(1, Ordering::Release);
 }
 
 /// Sends an IPI message to multiple CPUs.
@@ -697,6 +762,42 @@ mod tests {
 
     struct AtomicIpi {
         cpu_count: AtomicUsize,
+    }
+
+    #[test]
+    #[cfg(feature = "verismo-paging")]
+    fn paging_poll_accepts_only_explicitly_marked_messages_and_acknowledges_once() {
+        static INVOCATIONS: AtomicUsize = AtomicUsize::new(0);
+        unsafe fn record_flush(_: *const ()) {
+            INVOCATIONS.fetch_add(1, Ordering::Relaxed);
+        }
+        let requests = AtomicCpuSet::new();
+        let board = IpiBoard::default();
+        board.pending.store(1, Ordering::Relaxed);
+        board.request.set(MaybeUninit::new(IpiRequest::IpiShared));
+        board.handler.set(MaybeUninit::new(record_flush));
+        requests.add(0, Ordering::Release);
+        assert!(requests.contains(0, Ordering::Acquire));
+        // SAFETY: this test exclusively owns the initialized, pinned board.
+        unsafe { poll_paging_board(&requests, 0, &board) };
+        assert!(requests.contains(0, Ordering::Acquire));
+        assert_eq!(board.pending.load(Ordering::Acquire), 1);
+        assert_eq!(INVOCATIONS.load(Ordering::Relaxed), 0);
+        board.poll_with_paging_lock.set(true);
+        // SAFETY: the test handler only records completion in a static atomic;
+        // it does not dereference the unused message or take software locks.
+        unsafe { poll_paging_board(&requests, 0, &board) };
+        assert!(!requests.contains(0, Ordering::Acquire));
+        assert_eq!(board.pending.load(Ordering::Acquire), 0);
+        assert_eq!(INVOCATIONS.load(Ordering::Relaxed), 1);
+
+        let ordinary = AtomicIpi {
+            cpu_count: AtomicUsize::new(0),
+        };
+        assert!(!IpiHelperShared::new(&ordinary).poll_with_paging_lock());
+        assert!(
+            IpiHelperShared::new(&crate::cpu::tlb::TlbFlushScope::all()).poll_with_paging_lock()
+        );
     }
 
     // SAFETY: The test IPI method has no references and can safely use the

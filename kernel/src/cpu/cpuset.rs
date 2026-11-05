@@ -83,6 +83,11 @@ pub struct AtomicCpuSet {
 }
 
 impl AtomicCpuSet {
+    #[cfg(feature = "verismo-paging")]
+    pub(crate) fn contains(&self, cpu_index: usize, ordering: Ordering) -> bool {
+        self.bitmask[cpu_index >> 6].load(ordering) & (1u64 << (cpu_index & 0x3f)) != 0
+    }
+
     pub fn new() -> Self {
         Self::default()
     }

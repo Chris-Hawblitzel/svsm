@@ -117,7 +117,7 @@ impl TlbFlushScope {
 // SAFETY: The TlbFlushScope structure contains no references and can safely
 // rely on the default implementation of the IPI message copy routines.
 unsafe impl IpiMessage for TlbFlushScope {
-    #[cfg(feature = "verismo-paging")]
+    #[cfg(feature = "concurrent-paging")]
     fn poll_with_paging_lock(&self) -> bool {
         // Only local architectural invalidation, no paging/software locks.
         true

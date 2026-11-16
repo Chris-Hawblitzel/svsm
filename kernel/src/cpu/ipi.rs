@@ -83,7 +83,7 @@ pub unsafe trait IpiMessage {
     /// invalidates translations: it must not access pageable memory, acquire
     /// software locks, send IPIs, or re-enter paging. This is part of the
     /// unsafe implementation contract.
-    #[cfg(feature = "verismo-paging")]
+    #[cfg(feature = "concurrent-paging")]
     fn poll_with_paging_lock(&self) -> bool {
         false
     }
@@ -196,7 +196,7 @@ struct IpiBoard {
 
     // A function pointer that will handle the IPI on the receiving CPU.
     handler: Cell<MaybeUninit<unsafe fn(*const ())>>,
-    #[cfg(feature = "verismo-paging")]
+    #[cfg(feature = "concurrent-paging")]
     poll_with_paging_lock: Cell<bool>,
 }
 
@@ -232,7 +232,7 @@ pub trait IpiHelper {
     fn copy_to_shared(&self, shared_buffer: &mut [u8]);
     fn copy_from_shared(&mut self, shared_buffer: *const ());
     fn get_invoke_routine(&self) -> unsafe fn(*const ());
-    #[cfg(feature = "verismo-paging")]
+    #[cfg(feature = "concurrent-paging")]
     fn poll_with_paging_lock(&self) -> bool {
         false
     }
@@ -259,7 +259,7 @@ impl<'a, T: IpiMessage + Sync> IpiHelperShared<'a, T> {
 }
 
 impl<T: IpiMessage + Sync> IpiHelper for IpiHelperShared<'_, T> {
-    #[cfg(feature = "verismo-paging")]
+    #[cfg(feature = "concurrent-paging")]
     fn poll_with_paging_lock(&self) -> bool {
         self.message.poll_with_paging_lock()
     }
@@ -338,7 +338,7 @@ impl Default for IpiBoard {
             pending: AtomicUsize::new(0),
             message: UnsafeCell::new(MaybeUninit::uninit()),
             handler: Cell::new(MaybeUninit::uninit()),
-            #[cfg(feature = "verismo-paging")]
+            #[cfg(feature = "concurrent-paging")]
             poll_with_paging_lock: Cell::new(false),
         }
     }
@@ -370,7 +370,7 @@ fn send_ipi(target_set: IpiTarget<'_>, ipi_helper: &mut dyn IpiHelper) {
     ipi_board
         .handler
         .set(MaybeUninit::new(ipi_helper.get_invoke_routine()));
-    #[cfg(feature = "verismo-paging")]
+    #[cfg(feature = "concurrent-paging")]
     ipi_board
         .poll_with_paging_lock
         .set(ipi_helper.poll_with_paging_lock());
@@ -502,7 +502,7 @@ fn send_ipi(target_set: IpiTarget<'_>, ipi_helper: &mut dyn IpiHelper) {
     // TPR_IPI, any other IPIs that arrive while waiting here will interrupt
     // this spin loop and will be processed correctly.
     while ipi_board.pending.load(Ordering::Acquire) != 0 {
-        #[cfg(feature = "verismo-paging")]
+        #[cfg(feature = "concurrent-paging")]
         poll_paging_flush_ipis();
         core::hint::spin_loop();
     }
@@ -616,7 +616,7 @@ pub fn handle_ipi_interrupt() {
 /// writer can wait for remote invalidation while holding a content lock, and
 /// a remote waiter may have entered with IRQs disabled. Polling breaks that
 /// cycle without enabling unrelated interrupts or processing arbitrary IPIs.
-#[cfg(feature = "verismo-paging")]
+#[cfg(feature = "concurrent-paging")]
 pub(crate) fn poll_paging_flush_ipis() {
     let _guard = TprGuard::raise(TPR_IPI);
     // SAFETY: this CPU owns its receive state; TPR_IPI excludes its interrupt
@@ -636,7 +636,7 @@ pub(crate) fn poll_paging_flush_ipis() {
     }
 }
 
-#[cfg(feature = "verismo-paging")]
+#[cfg(feature = "concurrent-paging")]
 unsafe fn poll_paging_board(requests: &AtomicCpuSet, index: usize, board: &IpiBoard) {
     if !board.poll_with_paging_lock.get() {
         return;
@@ -765,7 +765,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "verismo-paging")]
+    #[cfg(feature = "concurrent-paging")]
     fn paging_poll_accepts_only_explicitly_marked_messages_and_acknowledges_once() {
         static INVOCATIONS: AtomicUsize = AtomicUsize::new(0);
         unsafe fn record_flush(_: *const ()) {

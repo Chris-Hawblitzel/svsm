@@ -12,12 +12,12 @@ pub mod mappings;
 pub mod memory;
 pub mod page_visibility;
 mod pagebox;
-#[cfg(not(feature = "verismo-paging"))]
+#[cfg(not(feature = "concurrent-paging"))]
 pub mod pagetable;
-#[cfg(feature = "verismo-paging")]
-#[path = "pagetable_verismo.rs"]
+#[cfg(feature = "concurrent-paging")]
+#[path = "pagetable_concurrent.rs"]
 pub mod pagetable;
-#[cfg(feature = "verismo-paging")]
+#[cfg(feature = "concurrent-paging")]
 #[path = "pagetable.rs"]
 #[allow(dead_code)]
 mod pagetable_native;

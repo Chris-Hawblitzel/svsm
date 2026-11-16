@@ -989,5 +989,5 @@ impl PageTablePart {
 }
 
 #[cfg(all(test, not(target_os = "none")))]
-#[path = "pagetable_verismo/tests.rs"]
+#[path = "pagetable_concurrent/tests.rs"]
 mod tests;

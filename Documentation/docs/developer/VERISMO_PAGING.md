@@ -1,6 +1,6 @@
 # Opt-in VeriSMo paging backend
 
-The `svsm` package's **`verismo-paging`** feature selects the adjacent
+The `svsm` package's **`concurrent-paging`** feature selects the adjacent
 `verios-pagetable-beta` package (library name `paging`). Native paging remains
 the default. This is a local integration: the dependency expects this checkout
 at `source/paging/compat/svsm`.
@@ -10,9 +10,9 @@ at `source/paging/compat/svsm`.
 Use the ordinary SVSM image recipes, adding the kernel feature:
 
 ```shell
-make FEATURES=verismo-paging
+make FEATURES=concurrent-paging
 # Equivalently, xbuild accepts the explicit package-qualified spelling:
-cargo xbuild -f svsm:verismo-paging ./configs/qemu-target.json
+cargo xbuild -f svsm:concurrent-paging ./configs/qemu-target.json
 ```
 
 For a linked kernel without image assembly:
@@ -20,7 +20,7 @@ For a linked kernel without image assembly:
 ```shell
 export CARGO_TARGET_DIR=target/verismo-integration
 cargo build -p svsm --bin svsm --target x86_64-unknown-none \
-    --release --features verismo-paging --locked
+    --release --features concurrent-paging --locked
 ```
 
 Executable host tests use SVSM's actual page allocator and selected backend,
@@ -29,10 +29,10 @@ with architectural flush hooks replaced by test event recording:
 ```shell
 export CARGO_TARGET_DIR=target/verismo-integration
 cargo test -p svsm --lib --target x86_64-unknown-linux-gnu \
-    --features verismo-paging --locked
+    --features concurrent-paging --locked
 # Focused adapter tests:
 cargo test -p svsm --lib --target x86_64-unknown-linux-gnu \
-    --features verismo-paging --locked mm::pagetable::tests
+    --features concurrent-paging --locked mm::pagetable::tests
 ```
 
 Use the checkout's pinned Rust toolchain. A working host linker is necessary
@@ -47,7 +47,7 @@ exact prereleases in the same `0.0.0` compatibility range. Checking the
 
 ## Architecture and ownership
 
-The implementation is `kernel/src/mm/pagetable_verismo.rs`; the existing
+The implementation is `kernel/src/mm/pagetable_concurrent.rs`; the existing
 `mm::pagetable` module path selects it only with the feature enabled.
 Native entry encodings, platform initialization, guest page-table walking,
 and early boot utilities remain available.

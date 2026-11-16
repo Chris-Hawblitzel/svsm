@@ -120,7 +120,7 @@ pub fn make_private_address(paddr: PhysAddr) -> PhysAddr {
     (strip_shared_address_bits(paddr).bits() | private_pte_mask()).into()
 }
 
-#[cfg(all(test, feature = "verismo-paging", not(target_os = "none")))]
+#[cfg(all(test, feature = "concurrent-paging", not(target_os = "none")))]
 pub(super) fn init_backend_test_masks() {
     let _ = PRIVATE_PTE_MASK.init(1 << 51);
     let _ = SHARED_PTE_MASK.init(1 << 50);

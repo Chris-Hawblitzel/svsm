@@ -146,7 +146,7 @@ impl VMR {
     /// # Safety
     /// No CPU may use this root until population completes. The scheduler
     /// must claim the task after the preceding CPU switched away from its CR3.
-    #[cfg(feature = "verismo-paging")]
+    #[cfg(feature = "concurrent-paging")]
     pub unsafe fn populate_inactive(&self, pgtbl: &mut PageTable) {
         let parts = self.pgtbl_parts.lock_read();
         for part in parts.iter() {

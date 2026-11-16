@@ -910,7 +910,7 @@ impl PerCpu {
     /// # Safety
     /// The caller must exclusively claim the task after its previous CPU
     /// switched off the root, and exclude all hardware users until return.
-    #[cfg(feature = "verismo-paging")]
+    #[cfg(feature = "concurrent-paging")]
     pub unsafe fn populate_page_table_inactive(&self, pt: &mut PageTable) {
         // SAFETY: the caller supplies the scheduler's inactive-root guarantee.
         unsafe { self.vm_range.populate_inactive(pt) };

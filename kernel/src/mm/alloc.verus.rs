@@ -584,7 +584,7 @@ impl HeapMemoryRegion {
  * Thus, instead of define a new proof function, we define inline proofs.
  * TODO(verus): support real inline proof functions instead of using macros.
  */
-#[cfg(verus_keep_ghost_body)]
+//#[cfg(verus_keep_ghost_body)]
 macro_rules! grant_info_write {
     ($mr: ident, $perm: ident => $mem: ident, $reserved: ident, $id: ident) => {
         proof_decl! {

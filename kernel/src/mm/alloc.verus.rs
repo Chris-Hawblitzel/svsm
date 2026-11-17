@@ -617,12 +617,14 @@ macro_rules! proof_lemma_free_page_pre {
     };
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_free_page_post {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_free_page_post {
     ($mr: ident, $pfn: ident, $order: ident, $mem: ident, $reserved: ident, $head_info: ident, $id: ident) => {
-        {
+        proof! {
             $reserved.tracked_insert($pfn, $head_info);
-            proof_revoke_info_write!($mr, $pfn, $order, $mem, $reserved, $id => pfn_perm);
+        }
+        proof_revoke_info_write!($mr, $pfn, $order, $mem, $reserved, $id => pfn_perm);
+        proof! {
             $mr.perms.borrow_mut().free.tracked_push($order, $pfn, pfn_perm);
         }
     };
@@ -651,14 +653,13 @@ macro_rules! proof_lemma_split_pre {
     }
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_split_post {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_split_post {
     ($mr: ident, $pfn1: ident, $pfn2: ident, $new_order: ident, $mem: ident, $mem2: ident, $reserved: ident, $reserved2: ident, $id: ident, $p1: ident) => {
-        {
-            // Insert the readonly share of info perm for the right pages into
-            // the tracked info perm to avoid future write outside.
-            proof_revoke_info_write!($mr, $pfn2, $new_order, $mem2, $reserved2, $id => p2);
-
+        // Insert the readonly share of info perm for the right pages into
+        // the tracked info perm to avoid future write outside.
+        proof_revoke_info_write!($mr, $pfn2, $new_order, $mem2, $reserved2, $id => p2);
+        proof! {
             // Add the new free perms into the free list.
             use_type_invariant(&p2.info);
             $mr.perms.borrow_mut().free.tracked_push($new_order, $pfn2, p2);
@@ -702,21 +703,23 @@ macro_rules! proof_lemma_merge_pre {
     };
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_merge_post {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_merge_post {
     ($mr: ident, $perm: ident, $pfn: ident, $order: ident, $new_order: ident, $mem: ident, $reserved: ident, $head_info: ident, $id: ident) => {
-        verus_proof_expr!({
+        proof! {
             // Insert the readonly share of info perm for the merged memory
             // back into the tracked info perm to avoid future write outside.
             $reserved.tracked_insert($pfn, $head_info);
-            proof_revoke_info_write!($mr, $pfn, $new_order, $mem, $reserved, $id => tmp_perm);
+        }
+        proof_revoke_info_write!($mr, $pfn, $new_order, $mem, $reserved, $id => tmp_perm);
+        proof! {
             *$perm = tmp_perm;
 
             // Prove the nr_page counter is correct.
             assert(2 * (1usize << $order) == (1usize << ($new_order)));
             assert($mr@.info.nr_page($order) == old($mr)@.info.nr_page($order) - 2);
             assert($mr@.info.nr_page($new_order) == old($mr)@.info.nr_page($new_order) + 1);
-        })
+        }
     };
 }
 
@@ -741,12 +744,12 @@ macro_rules! proof_lemma_alloc_pfn_loop_pre {
     }
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_alloc_pfn_loop_post {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_alloc_pfn_loop_post {
     ($mr: ident, $perm: ident, $old_pfn: ident, $current_pfn: ident, $order: ident, $idx_: ident, $prev_mem: ident, $prev_info_id: ident,
         $prev_reserved: ident, $prev_head_info: ident, $mem: ident, $info_id: ident, $reserved: ident,
         $head_info: ident) => {
-        verus_proof_expr!({
+        proof! {
             // Insert the readonly share of info perm for prev free pages
             $prev_reserved.tracked_insert($old_pfn, $prev_head_info);
 
@@ -759,12 +762,13 @@ macro_rules! lemma_alloc_pfn_loop_post {
             // Insert the readonly share of info perm for the allocated
             // pages to avoid future change from inside and outside of MR.
             $reserved.tracked_insert($current_pfn, $head_info);
-
-            proof_revoke_info_write!($mr, $current_pfn, $order, $mem, $reserved, $info_id => tmp_perm);
+        }
+        proof_revoke_info_write!($mr, $current_pfn, $order, $mem, $reserved, $info_id => tmp_perm);
+        proof! {
             *$perm = tmp_perm;
             // Prove free list is still strictly wellformed.
             old($mr)@.free.lemma_wf_restrict_remove(&$mr.perms.borrow().free, $order, $idx_);
-        })
+        }
     }
 }
 

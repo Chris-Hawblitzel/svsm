@@ -897,9 +897,7 @@ impl HeapMemoryRegion {
         self.init_compound_page(pfn2, new_order, next_pfn);
         self.next_page[new_order] = pfn1;
 
-        proof! {
-            lemma_split_post!(self, pfn1, pfn2, new_order, mem, mem2, reserved, reserved2, id, p1);
-        }
+        proof_lemma_split_post!(self, pfn1, pfn2, new_order, mem, mem2, reserved, reserved2, id, p1);
 
         // Do the accounting
         self.nr_pages[order] -= 1;
@@ -1154,9 +1152,7 @@ impl HeapMemoryRegion {
         proof_with!(Tracked(&mut reserved));
         self.mark_compound_page(pfn, new_order);
 
-        proof! {
-            lemma_merge_post!(self, perm, pfn, order, new_order, mem, reserved, head_info, id);
-        }
+        proof_lemma_merge_post!(self, perm, pfn, order, new_order, mem, reserved, head_info, id);
 
         // Do the accounting - none of the pages is free yet, so free_pages is
         // not updated here.
@@ -1288,10 +1284,8 @@ impl HeapMemoryRegion {
 
             self.free_pages[order] -= 1;
 
-            proof! {
-                lemma_alloc_pfn_loop_post!(self, perm, old_pfn, current_pfn, order, idx_,
-                    prev_mem, prev_id, prev_reserved, prev_head_info, mem, id, reserved, head_info);
-            }
+            proof_lemma_alloc_pfn_loop_post!(self, perm, old_pfn, current_pfn, order, idx_,
+                prev_mem, prev_id, prev_reserved, prev_head_info, mem, id, reserved, head_info);
 
             return Ok(());
         }
@@ -1321,9 +1315,7 @@ impl HeapMemoryRegion {
         proof_with!(Tracked(&mut head_info));
         self.write_page_info(pfn, pg);
 
-        proof! {
-            lemma_free_page_post!(self, pfn, order, mem, other_info, head_info, id);
-        }
+        proof_lemma_free_page_post!(self, pfn, order, mem, other_info, head_info, id);
 
         self.next_page[order] = pfn;
 

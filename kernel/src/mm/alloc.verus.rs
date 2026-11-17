@@ -620,7 +620,7 @@ macro_rules! proof_lemma_free_page_pre {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_free_page_post {
     ($mr: ident, $pfn: ident, $order: ident, $mem: ident, $reserved: ident, $head_info: ident, $id: ident) => {
-        proof! {
+        {
             $reserved.tracked_insert($pfn, $head_info);
             proof_revoke_info_write!($mr, $pfn, $order, $mem, $reserved, $id => pfn_perm);
             $mr.perms.borrow_mut().free.tracked_push($order, $pfn, pfn_perm);
@@ -654,7 +654,7 @@ macro_rules! proof_lemma_split_pre {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_split_post {
     ($mr: ident, $pfn1: ident, $pfn2: ident, $new_order: ident, $mem: ident, $mem2: ident, $reserved: ident, $reserved2: ident, $id: ident, $p1: ident) => {
-        proof! {
+        {
             // Insert the readonly share of info perm for the right pages into
             // the tracked info perm to avoid future write outside.
             proof_revoke_info_write!($mr, $pfn2, $new_order, $mem2, $reserved2, $id => p2);
@@ -705,7 +705,7 @@ macro_rules! proof_lemma_merge_pre {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_merge_post {
     ($mr: ident, $perm: ident, $pfn: ident, $order: ident, $new_order: ident, $mem: ident, $reserved: ident, $head_info: ident, $id: ident) => {
-        proof! {
+        {
             // Insert the readonly share of info perm for the merged memory
             // back into the tracked info perm to avoid future write outside.
             $reserved.tracked_insert($pfn, $head_info);
@@ -746,7 +746,7 @@ macro_rules! lemma_alloc_pfn_loop_post {
     ($mr: ident, $perm: ident, $old_pfn: ident, $current_pfn: ident, $order: ident, $idx_: ident, $prev_mem: ident, $prev_info_id: ident,
         $prev_reserved: ident, $prev_head_info: ident, $mem: ident, $info_id: ident, $reserved: ident,
         $head_info: ident) => {
-        proof!{
+        {
             // Insert the readonly share of info perm for prev free pages
             $prev_reserved.tracked_insert($old_pfn, $prev_head_info);
 
@@ -792,7 +792,7 @@ macro_rules! proof_lemma_free_page {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_get_pfn {
     ($mr: ident, $vaddr: ident) => {
-        proof! {
+        {
             use_type_invariant($vaddr);
             reveal(<LinearMap as SpecMemMapTr>::to_paddr);
             if $mr@.map().virt_start.offset() <= $vaddr.offset() < $mr@.map().virt_start.offset() + $mr@.map().size {
@@ -818,7 +818,7 @@ macro_rules! proof_lemma_alloc_pages_info_pre {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_alloc_pages_info_post {
     ($self: ident, $order: ident, $pfn: ident, $mem: ident, $info: ident, $reserved: ident, $info_head: ident, $ret_perm: ident) => {
-        proof!{
+        {
             // Insert the readonly share of info perm into the tracked info perm
             $reserved.tracked_insert($pfn, $info_head);
             let tracked info = $self.perms.borrow_mut().info.tracked_insert_unit($order, $pfn, $info.id(), $reserved);

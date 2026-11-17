@@ -597,8 +597,8 @@ macro_rules! grant_info_write {
     };
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! revoke_info_write {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_revoke_info_write {
     ($mr: ident, $pfn: ident, $order: ident, $mem: ident, $reserved: ident, $id: ident => $p: ident) => {
         proof_decl!{
             let tracked info = $mr.perms.borrow_mut().info.tracked_insert_unit($order, $pfn, $id, $reserved);
@@ -607,11 +607,11 @@ macro_rules! revoke_info_write {
     }
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_free_page_pre {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_free_page_pre {
     ($mr: ident, $perm: ident, $pfn: ident => $mem: ident, $reserved: ident, $head_info: ident, $id: ident) => {
+        grant_info_write!($mr, $perm => $mem, $reserved, $id);
         proof_decl! {
-            grant_info_write!($mr, $perm => $mem, $reserved, $id);
             let tracked mut $head_info = $reserved.tracked_remove($pfn);
         }
     };
@@ -620,16 +620,16 @@ macro_rules! lemma_free_page_pre {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_free_page_post {
     ($mr: ident, $pfn: ident, $order: ident, $mem: ident, $reserved: ident, $head_info: ident, $id: ident) => {
-        proof_decl! {
+        proof! {
             $reserved.tracked_insert($pfn, $head_info);
-            revoke_info_write!($mr, $pfn, $order, $mem, $reserved, $id => pfn_perm);
+            proof_revoke_info_write!($mr, $pfn, $order, $mem, $reserved, $id => pfn_perm);
             $mr.perms.borrow_mut().free.tracked_push($order, $pfn, pfn_perm);
         }
     };
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_split_pre {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_split_pre {
     ($mr: ident, $perm: ident, $pfn1: ident, $pfn2: ident, $order: ident, $new_order: ident => $mem: ident, $mem2: ident, $reserved: ident, $reserved2: ident, $info: ident, $id: ident) => {
         proof_decl!{
             // To prove that nr_pages[new_order] < usize::MAX - 2.
@@ -637,8 +637,9 @@ macro_rules! lemma_split_pre {
 
             // Grant write access to the page info.
             use_type_invariant(&$perm.info);
-            grant_info_write!($mr, $perm => $mem, $reserved2, $id);
-
+        }
+        grant_info_write!($mr, $perm => $mem, $reserved2, $id);
+        proof_decl!{
             let tracked mut $reserved = $reserved2.tracked_remove_keys(Set::range($pfn1, $pfn2));
 
             // Prove the next page is valid.
@@ -653,10 +654,10 @@ macro_rules! lemma_split_pre {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_split_post {
     ($mr: ident, $pfn1: ident, $pfn2: ident, $new_order: ident, $mem: ident, $mem2: ident, $reserved: ident, $reserved2: ident, $id: ident, $p1: ident) => {
-        proof_decl! {
+        proof! {
             // Insert the readonly share of info perm for the right pages into
             // the tracked info perm to avoid future write outside.
-            revoke_info_write!($mr, $pfn2, $new_order, $mem2, $reserved2, $id => p2);
+            proof_revoke_info_write!($mr, $pfn2, $new_order, $mem2, $reserved2, $id => p2);
 
             // Add the new free perms into the free list.
             use_type_invariant(&p2.info);
@@ -667,8 +668,8 @@ macro_rules! lemma_split_post {
     };
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_merge_pre {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_merge_pre {
     ($mr: ident, $perm: ident, $p2: ident, $pfn1: ident, $pfn2: ident, $pfn: ident, $order: ident, $new_order: ident => $mem: ident, $reserved: ident, $head_info: ident, $id: ident) => {
         proof_decl! {
             // Proves that nr_page[new_order] <= usize:MAX - 1.
@@ -704,11 +705,11 @@ macro_rules! lemma_merge_pre {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_merge_post {
     ($mr: ident, $perm: ident, $pfn: ident, $order: ident, $new_order: ident, $mem: ident, $reserved: ident, $head_info: ident, $id: ident) => {
-        proof_decl! {
+        proof! {
             // Insert the readonly share of info perm for the merged memory
             // back into the tracked info perm to avoid future write outside.
             $reserved.tracked_insert($pfn, $head_info);
-            revoke_info_write!($mr, $pfn, $new_order, $mem, $reserved, $id => tmp_perm);
+            proof_revoke_info_write!($mr, $pfn, $new_order, $mem, $reserved, $id => tmp_perm);
             *$perm = tmp_perm;
 
             // Prove the nr_page counter is correct.
@@ -719,8 +720,8 @@ macro_rules! lemma_merge_post {
     };
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_alloc_pfn_loop_pre {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_alloc_pfn_loop_pre {
     ($mr: ident, $perm: ident, $old_pfn: ident, $current_pfn: ident, $order: ident, $idx_: ident =>
         $prev_mem: ident,  $prev_id: ident, $prev_reserved: ident, $prev_head_info:ident,
         $mem: ident, $id: ident, $reserved: ident, $head_info: ident) => {
@@ -730,12 +731,13 @@ macro_rules! lemma_alloc_pfn_loop_pre {
 
             // Get prev mem and info perms and grant write to info perm.
             let tracked mut prev_perm = $mr.perms.borrow_mut().free.tracked_remove($order, $idx_ + 1);
-            lemma_free_page_pre!($mr, prev_perm, $old_pfn => $prev_mem, $prev_reserved, $prev_head_info, $prev_id);
-
+        }
+        proof_lemma_free_page_pre!($mr, prev_perm, $old_pfn => $prev_mem, $prev_reserved, $prev_head_info, $prev_id);
+        proof_decl!{
             // Get current mem and info perms and grant write to info perm.
             let tracked mut current_perm = $mr.perms.borrow_mut().free.tracked_remove($order, $idx_);
-            lemma_free_page_pre!($mr, current_perm, $current_pfn => $mem, $reserved, $head_info, $id);
         }
+        proof_lemma_free_page_pre!($mr, current_perm, $current_pfn => $mem, $reserved, $head_info, $id);
     }
 }
 
@@ -744,7 +746,7 @@ macro_rules! lemma_alloc_pfn_loop_post {
     ($mr: ident, $perm: ident, $old_pfn: ident, $current_pfn: ident, $order: ident, $idx_: ident, $prev_mem: ident, $prev_info_id: ident,
         $prev_reserved: ident, $prev_head_info: ident, $mem: ident, $info_id: ident, $reserved: ident,
         $head_info: ident) => {
-        proof_decl!{
+        proof!{
             // Insert the readonly share of info perm for prev free pages
             $prev_reserved.tracked_insert($old_pfn, $prev_head_info);
 
@@ -758,7 +760,7 @@ macro_rules! lemma_alloc_pfn_loop_post {
             // pages to avoid future change from inside and outside of MR.
             $reserved.tracked_insert($current_pfn, $head_info);
 
-            revoke_info_write!($mr, $current_pfn, $order, $mem, $reserved, $info_id => tmp_perm);
+            proof_revoke_info_write!($mr, $current_pfn, $order, $mem, $reserved, $info_id => tmp_perm);
             *$perm = tmp_perm;
             // Prove free list is still strictly wellformed.
             old($mr)@.free.lemma_wf_restrict_remove(&$mr.perms.borrow().free, $order, $idx_);
@@ -766,8 +768,8 @@ macro_rules! lemma_alloc_pfn_loop_post {
     }
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_free_page {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_free_page {
     ($mr: ident, $inperm: ident, $pfn: ident, $res: ident => $perm: ident) => {
         proof_decl! {
             // Prove the passed pages are valid.
@@ -800,8 +802,8 @@ macro_rules! lemma_get_pfn {
     }
 }
 
-#[cfg(verus_keep_ghost_body)]
-macro_rules! lemma_alloc_pages_info_pre {
+//#[cfg(verus_keep_ghost_body)]
+macro_rules! proof_lemma_alloc_pages_info_pre {
     ($self: ident, $pfn: ident, $perm: ident => $mem: ident, $info: ident, $reserved: ident, $info_head: ident) => {
         proof_decl! {
             // Grant write access to the page info.

@@ -747,7 +747,7 @@ impl HeapMemoryRegion {
             self.ens_get_pfn(vaddr, ret),
     )]
     fn get_pfn(&self, vaddr: VirtAddr) -> Result<usize, AllocError> {
-        proof_decl! {
+        proof! {
             lemma_get_pfn!(self, vaddr);
         }
         self.get_virt_offset(vaddr)
@@ -885,20 +885,19 @@ impl HeapMemoryRegion {
 
         proof_decl! {
             let ghost x = seq![1u8, 2u8];
-            lemma_split_pre!(self, perm, pfn1, pfn2, order, new_order => mem, mem2, reserved, reserved2, info, id);
         }
+        proof_lemma_split_pre!(self, perm, pfn1, pfn2, order, new_order => mem, mem2, reserved, reserved2, info, id);
+
         proof_with!(Tracked(&mut reserved));
         self.init_compound_page(pfn1, new_order, pfn2);
 
-        proof_decl! {
-            revoke_info_write!(self, pfn1, new_order, mem, reserved, id => p1);
-        }
+        proof_revoke_info_write!(self, pfn1, new_order, mem, reserved, id => p1);
 
         proof_with!(Tracked(&mut reserved2));
         self.init_compound_page(pfn2, new_order, next_pfn);
         self.next_page[new_order] = pfn1;
 
-        proof_decl! {
+        proof! {
             lemma_split_post!(self, pfn1, pfn2, new_order, mem, mem2, reserved, reserved2, id, p1);
         }
 
@@ -972,13 +971,13 @@ impl HeapMemoryRegion {
         self.refill_page_list(order)?;
         proof_with!(Tracked(&mut perm));
         let pfn = self.get_next_page(order)?;
-        proof_decl! {
-            // Grant write access to the page info.
-            lemma_alloc_pages_info_pre!(self, pfn, perm => mem, info, reserved, info_head);
-        }
+
+        // Grant write access to the page info.
+        proof_lemma_alloc_pages_info_pre!(self, pfn, perm => mem, info, reserved, info_head);
+
         proof_with!(Tracked(&mut info_head));
         self.write_page_info(pfn, pg);
-        proof_decl! {
+        proof! {
             lemma_alloc_pages_info_post!(self, order, pfn, mem, info, reserved, info_head, ret_perm);
         }
         Ok(self.start_virt + (pfn * PAGE_SIZE))
@@ -1143,9 +1142,7 @@ impl HeapMemoryRegion {
         let new_order = order + 1;
         let pfn = pfn1.min(pfn2);
 
-        proof_decl! {
-            lemma_merge_pre!(self, perm, p2, pfn1, pfn2, pfn, order, new_order => mem, reserved, head_info, id);
-        }
+        proof_lemma_merge_pre!(self, perm, p2, pfn1, pfn2, pfn, order, new_order => mem, reserved, head_info, id);
 
         // Write new compound head
         let pg = PageInfo::Allocated(AllocatedInfo { order: new_order });
@@ -1157,7 +1154,7 @@ impl HeapMemoryRegion {
         proof_with!(Tracked(&mut reserved));
         self.mark_compound_page(pfn, new_order);
 
-        proof_decl! {
+        proof! {
             lemma_merge_post!(self, perm, pfn, order, new_order, mem, reserved, head_info, id);
         }
 
@@ -1276,10 +1273,8 @@ impl HeapMemoryRegion {
             }
             proof_with!(Tracked(current_perm));
             let next_pfn = self.next_free_pfn(current_pfn, order);
-            proof_decl! {
-                lemma_alloc_pfn_loop_pre!(self, perm, old_pfn, current_pfn, order, idx_
-                    => prev_mem, prev_id, prev_reserved, prev_head_info, mem, id, reserved, head_info);
-            }
+            proof_lemma_alloc_pfn_loop_pre!(self, perm, old_pfn, current_pfn, order, idx_
+                => prev_mem, prev_id, prev_reserved, prev_head_info, mem, id, reserved, head_info);
             let pg = PageInfo::Free(FreeInfo {
                 next_page: next_pfn,
                 order,
@@ -1293,7 +1288,7 @@ impl HeapMemoryRegion {
 
             self.free_pages[order] -= 1;
 
-            proof_decl! {
+            proof! {
                 lemma_alloc_pfn_loop_post!(self, perm, old_pfn, current_pfn, order, idx_,
                     prev_mem, prev_id, prev_reserved, prev_head_info, mem, id, reserved, head_info);
             }
@@ -1317,9 +1312,7 @@ impl HeapMemoryRegion {
     )]
     fn free_page_raw(&mut self, pfn: usize, order: usize) {
         let old_next = self.next_page[order];
-        proof_decl! {
-            lemma_free_page_pre!(self, perm, pfn => mem, other_info, head_info, id);
-        }
+        proof_lemma_free_page_pre!(self, perm, pfn => mem, other_info, head_info, id);
         let pg = PageInfo::Free(FreeInfo {
             next_page: old_next,
             order,
@@ -1328,7 +1321,7 @@ impl HeapMemoryRegion {
         proof_with!(Tracked(&mut head_info));
         self.write_page_info(pfn, pg);
 
-        proof_decl! {
+        proof! {
             lemma_free_page_post!(self, pfn, order, mem, other_info, head_info, id);
         }
 
@@ -1423,9 +1416,7 @@ impl HeapMemoryRegion {
 
         let res = self.read_page_info(pfn);
 
-        proof_decl! {
-            lemma_free_page!(self, alloced_perm, pfn, res => perm);
-        }
+        proof_lemma_free_page!(self, alloced_perm, pfn, res => perm);
 
         match res {
             PageInfo::Allocated(ai) => {

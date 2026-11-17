@@ -705,7 +705,7 @@ macro_rules! proof_lemma_merge_pre {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_merge_post {
     ($mr: ident, $perm: ident, $pfn: ident, $order: ident, $new_order: ident, $mem: ident, $reserved: ident, $head_info: ident, $id: ident) => {
-        {
+        verus_proof_expr!({
             // Insert the readonly share of info perm for the merged memory
             // back into the tracked info perm to avoid future write outside.
             $reserved.tracked_insert($pfn, $head_info);
@@ -716,7 +716,7 @@ macro_rules! lemma_merge_post {
             assert(2 * (1usize << $order) == (1usize << ($new_order)));
             assert($mr@.info.nr_page($order) == old($mr)@.info.nr_page($order) - 2);
             assert($mr@.info.nr_page($new_order) == old($mr)@.info.nr_page($new_order) + 1);
-        }
+        })
     };
 }
 
@@ -746,7 +746,7 @@ macro_rules! lemma_alloc_pfn_loop_post {
     ($mr: ident, $perm: ident, $old_pfn: ident, $current_pfn: ident, $order: ident, $idx_: ident, $prev_mem: ident, $prev_info_id: ident,
         $prev_reserved: ident, $prev_head_info: ident, $mem: ident, $info_id: ident, $reserved: ident,
         $head_info: ident) => {
-        {
+        verus_proof_expr!({
             // Insert the readonly share of info perm for prev free pages
             $prev_reserved.tracked_insert($old_pfn, $prev_head_info);
 
@@ -764,7 +764,7 @@ macro_rules! lemma_alloc_pfn_loop_post {
             *$perm = tmp_perm;
             // Prove free list is still strictly wellformed.
             old($mr)@.free.lemma_wf_restrict_remove(&$mr.perms.borrow().free, $order, $idx_);
-        }
+        })
     }
 }
 
@@ -792,13 +792,13 @@ macro_rules! proof_lemma_free_page {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_get_pfn {
     ($mr: ident, $vaddr: ident) => {
-        {
+        verus_proof_expr!({
             use_type_invariant($vaddr);
             reveal(<LinearMap as SpecMemMapTr>::to_paddr);
             if $mr@.map().virt_start.offset() <= $vaddr.offset() < $mr@.map().virt_start.offset() + $mr@.map().size {
                 $mr@.map().lemma_get_pfn_get_virt($vaddr);
             }
-        }
+        })
     }
 }
 
@@ -818,7 +818,7 @@ macro_rules! proof_lemma_alloc_pages_info_pre {
 #[cfg(verus_keep_ghost_body)]
 macro_rules! lemma_alloc_pages_info_post {
     ($self: ident, $order: ident, $pfn: ident, $mem: ident, $info: ident, $reserved: ident, $info_head: ident, $ret_perm: ident) => {
-        {
+        verus_proof_expr!({
             // Insert the readonly share of info perm into the tracked info perm
             $reserved.tracked_insert($pfn, $info_head);
             let tracked info = $self.perms.borrow_mut().info.tracked_insert_unit($order, $pfn, $info.id(), $reserved);
@@ -831,6 +831,6 @@ macro_rules! lemma_alloc_pages_info_post {
             // assert(pfn == self.spec_get_pfn(vaddr).unwrap()) by {
             reveal(<LinearMap as SpecMemMapTr>::to_paddr);
             // };
-        }
+        })
     }
 }
